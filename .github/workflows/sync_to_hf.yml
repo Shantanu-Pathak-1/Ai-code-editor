@@ -1,8 +1,29 @@
-{
-  "files": [
-    {
-      "path": ".github/workflows/sync_to_hf.yml",
-      "content": "name: Sync to Hugging Face Hub\n\non:\n  push:\n    branches: [main]\n  workflow_dispatch:\n\njobs:\n  sync-to-hub:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n        with:\n          fetch-depth: 0\n          lfs: true\n      - name: Push to Hugging Face Hub\n        env:\n          HF_TOKEN: ${{ secrets.HF_TOKEN }}\n          HF_USER: \"shantanupathak94\"\n          HF_SPACE: \"Ai-code-editor\"\n        run: |\n          git config --global user.email \"shantanupathak94@gmail.com\"\n          git config --global user.name \"shantanu\"\n          \n          git remote add hf https://user:$HF_TOKEN@huggingface.co/spaces/$HF_USER/$HF_SPACE\n          git push -f hf main\n"
-    }
-  ]
-}
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches: [main]
+  # Isse tum manually bhi button daba kar sync kar sakte ho
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Latest version
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Git configuration
+          git config --global user.email "shantanupathak94@gmail.com"
+          git config --global user.name "shantanu"
+          
+          # Force push to HF Space (shantanupathak94/Ai-code-editor)
+          git remote add hf https://shantanupathak94:$HF_TOKEN@huggingface.co/spaces/shantanupathak94/Ai-code-editor
+          git push --force hf main
