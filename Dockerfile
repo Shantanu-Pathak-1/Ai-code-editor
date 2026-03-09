@@ -1,15 +1,28 @@
-# Base image
-FROM python:3.9
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  ETHRIX-FORGE — Dockerfile for Hugging Face Spaces                 ║
+# ╚══════════════════════════════════════════════════════════════════════╝
 
-# Working directory set karna
-WORKDIR /code
+FROM python:3.11-slim
 
-# Requirements file copy aur install karna
-COPY ./requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+# HF Spaces required label
+LABEL maintainer="Ethrix-Forge"
 
-# Humara app code copy karna
-COPY . .
+# Install git (required by GitPython for clone operations)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Hugging face ke port 7860 par FastAPI ko run karna
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+WORKDIR /app
+
+# Install Python dependencies first (layer cache optimisation)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY main.py .
+
+# HF Spaces runs on port 7860
+EXPOSE 7860
+
+# Run the FastAPI server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
