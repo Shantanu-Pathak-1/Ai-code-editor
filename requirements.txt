@@ -5,28 +5,28 @@
 
 # ── Web Framework ─────────────────────────────────────────────────────
 fastapi==0.115.5
-uvicorn[standard]==0.32.1        # ASGI server (includes uvloop + httptools)
+uvicorn[standard]==0.32.1
 
 # ── HTTP Client (async) ───────────────────────────────────────────────
-httpx==0.28.0                    # Used by AI Gateway for async provider calls
+httpx==0.28.0
 
 # ── MongoDB (async) ───────────────────────────────────────────────────
-motor==3.6.0                     # Async PyMongo driver
-pymongo==4.10.1                  # Sync PyMongo (motor dependency)
+motor==3.6.0
+pymongo==4.9.2
 
 # ── GitHub ────────────────────────────────────────────────────────────
-PyGithub==2.4.0                  # GitHub REST API v3 wrapper
-GitPython==3.1.43                # Local git operations (clone)
+PyGithub==2.4.0
+GitPython==3.1.43
 
 # ── Google OAuth2 / Drive ─────────────────────────────────────────────
-google-auth==2.36.0              # Google authentication library
-google-auth-oauthlib==1.2.1      # OAuth2 flow helpers
-google-api-python-client==2.155.0 # Google Drive API client
-google-auth-httplib2==0.2.0      # httplib2 transport for google-auth
+google-auth==2.36.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.155.0
+google-auth-httplib2==0.2.0
 
 # ── Data Validation ───────────────────────────────────────────────────
-pydantic==2.10.3                 # FastAPI uses Pydantic v2 for models
+pydantic==2.10.3
 
 # ── Utilities ─────────────────────────────────────────────────────────
-python-multipart==0.0.17         # For form/file uploads in FastAPI
-python-dotenv==1.0.1             # Load .env in local development
+python-multipart==0.0.17
+python-dotenv==1.0.1
