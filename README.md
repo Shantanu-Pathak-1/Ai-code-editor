@@ -1,3 +1,12 @@
+---
+title: Ethrix-Forge
+emoji: 🛠️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_file: app.py
+pinned: false
+---
 # 🛠️ Ethrix-Forge : AI Auto-Coding Agent
 
 Welcome to the official cloud workspace of **Ethrix-Forge**, a next-generation AI-powered Code Editor and autonomous development environment. 
