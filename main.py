@@ -59,6 +59,7 @@ from googleapiclient.http import MediaIoBaseUpload
 from google.auth.transport.requests import Request as GoogleRequest
 from google import genai
 import asyncio
+import logging
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LOGGING
@@ -857,33 +858,41 @@ class AIGatewayResponse(BaseModel):
     model:        str
 
 
-# ── Internal AI Callers ──────────────────────────────────────────────────────
+# ── Naya Gemini SDK Import ──
+log = logging.getLogger("ethrix-forge")
 
 async def _call_gemini_gateway(prompt: str, model: str) -> str:
-    """Call Gemini using the official google-genai SDK provided by Shantanu."""
+    """Bulletproof Gemini Call for Shantanu's Ethrix-Forge"""
     if not GEMINI_API_KEY:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not set on the server.")
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is missing!")
 
     try:
-        # Client automatically environment variable se GEMINI_API_KEY utha lega
-        client = genai.Client()
+        # 1. Api Key explicitly pass kar rahe hain taaki Docker mein error na aaye
+        client = genai.Client(api_key=GEMINI_API_KEY)
         
-        # Humara strict JSON wala system prompt aur tumhara prompt ek sath jod rahe hain
         full_prompt = f"{SYSTEM_PROMPT}\n\nUser Request:\n{prompt}"
         
-        # Tumhara laya hua latest generation code (asyncio thread mein run kar rahe hain taaki server hang na ho)
+        # 2. Tumhara function
         def sync_gemini_call():
             return client.models.generate_content(
-                model="gemini-3-flash-preview", # Tumhara latest model!
+                # Darling, agar 'gemini-3-flash-preview' fail ho raha ho, toh isko 
+                # 'gemini-2.0-flash' kar dena, API keys par naye model block ho sakte hain!
+                model="gemini-2.0-flash", 
                 contents=full_prompt
             )
             
+        # 3. Thread mein run kiya
         response = await asyncio.to_thread(sync_gemini_call)
+        
+        # 4. Hugging Face Logs mein print karega taaki hum result dekh sakein!
+        log.info(f"Gemini Success! Raw Response: {response.text[:100]}...") 
+        
         return response.text
 
     except Exception as e:
-        log.error(f"Gemini SDK Error: {str(e)}")
-        raise HTTPException(status_code=502, detail=f"Gemini SDK error: {str(e)}")
+        # Asli error ab Hugging Face ke Logs mein print hoga!
+        log.error(f"GEMINI CRASHED: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Gemini API Error: {str(e)}")
 
 
 async def _call_groq_gateway(prompt: str, model: str) -> str:
