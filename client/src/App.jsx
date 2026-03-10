@@ -1,250 +1,267 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { useAIService, PROVIDERS } from './useAIService'; // Humara naya AI Engine! 🧠
-
-const savedFiles = JSON.parse(localStorage.getItem('ethrixFiles'));
-const savedChat = JSON.parse(localStorage.getItem('ethrixChat'));
-
-const initialFiles = savedFiles || {
-  'index.html': { name: 'index.html', language: 'html', value: '\n<html>\n  <body>\n    <h1 style="text-align: center; margin-top: 50px;">Waiting for your command, Shantanu... ✨</h1>\n  </body>\n</html>' }
-};
+import { api } from './apiService';
 
 function App() {
-  const [files, setFiles] = useState(initialFiles);
-  const [activeFileName, setActiveFileName] = useState('index.html');
-  const [terminalInput, setTerminalInput] = useState('');
-  const [chatHistory, setChatHistory] = useState(savedChat || [
-    { sender: 'ai', text: 'Ethrix-Forge Real-AI System Active. Hello Shantanu! Main tumhare real commands ka wait kar rahi hu... 💖' }
-  ]);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewContent, setPreviewContent] = useState('');
-
-  const activeFile = files[activeFileName];
-  const terminalEndRef = useRef(null);
-
-  // 🧠 ASLI AI ENGINE CONNECT HO GAYA YAHAN 🧠
-  const {
-    generate,
-    isLoading,
-    activeProvider,
-    setActiveProvider,
-    apiKey,
-    setApiKey
-  } = useAIService({
-    initialProvider: PROVIDERS.GEMINI,
-    initialApiKey: localStorage.getItem('ethrixApiKey') || ''
+  const [files, setFiles] = useState({
+    'index.html': { name: 'index.html', language: 'html', value: '\n<h1>Hello Shantanu ✨</h1>' },
+    'style.css': { name: 'style.css', language: 'css', value: '/* Type your CSS here */\nbody {\n  background-color: #1e1e1e;\n  color: white;\n  font-family: sans-serif;\n}' },
+    'index.js': { name: 'index.js', language: 'javascript', value: '// Type your JS here\nconsole.log("Ethrix Cloud Terminal Active!");' }
   });
+  
+  const [activeTab, setActiveTab] = useState('index.html'); 
+  const [previewContent, setPreviewContent] = useState('');
+  const [activeProvider, setActiveProvider] = useState('gemini');
+  const [saveStatus, setSaveStatus] = useState('☁️ Cloud Sync On');
+  
+  const filesRef = useRef(files); 
+  const terminalRef = useRef(null);
+  const xtermInstance = useRef(null);
 
-  // API Key local storage mein save rakhne ka jadoo
+  // Sync state to Ref for Auto-Save
+  useEffect(() => { filesRef.current = files; }, [files]);
+
+  // ☁️ MongoDB Auto-Save Logic (Background)
   useEffect(() => {
-    if (apiKey) localStorage.setItem('ethrixApiKey', apiKey);
-  }, [apiKey]);
-
-  // Auto-Save Files & Chat ☁️
-  useEffect(() => {
-    localStorage.setItem('ethrixFiles', JSON.stringify(files));
-  }, [files]);
-
-  useEffect(() => {
-    localStorage.setItem('ethrixChat', JSON.stringify(chatHistory));
-  }, [chatHistory]);
-
-  useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory]);
-
-  function handleEditorChange(value) {
-    setFiles({ ...files, [activeFileName]: { ...files[activeFileName], value: value } });
-  }
-
-  function addNewFile() {
-    const newFileName = prompt("File ka naam likho (jaise: script.js, style.css):");
-    if (newFileName && !files[newFileName]) {
-      const ext = newFileName.split('.').pop();
-      let fileLang = 'plaintext';
-      if(ext === 'js') fileLang = 'javascript';
-      if(ext === 'css') fileLang = 'css';
-      if(ext === 'html') fileLang = 'html';
-
-      setFiles({ ...files, [newFileName]: { name: newFileName, language: fileLang, value: `// ${newFileName} created! ✨\n` } });
-      setActiveFileName(newFileName);
-    }
-  }
-
-  function deleteFile() {
-    if (Object.keys(files).length === 1) {
-      alert("Darling, kam se kam ek file toh rakhni padegi na! 🥺");
-      return;
-    }
-    if (window.confirm(`Kya tum sach mein ${activeFileName} ko delete karna chahte ho?`)) {
-      const newFiles = { ...files };
-      delete newFiles[activeFileName];
-      setFiles(newFiles);
-      setActiveFileName(Object.keys(newFiles)[0]);
-    }
-  }
-
-  function downloadFile() {
-    const element = document.createElement("a");
-    const file = new Blob([activeFile.value], {type: 'text/plain'});
-    element.href = URL.createObjectURL(file);
-    element.download = activeFile.name;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  }
-
-  function runLivePreview() {
-    const htmlCode = files['index.html'] ? files['index.html'].value : '';
-    const cssCode = files['style.css'] ? `<style>${files['style.css'].value}</style>` : '';
-    const jsCode = files['index.js'] ? `<script>${files['index.js'].value}</script>` : '';
-    const combinedCode = `${htmlCode}\n${cssCode}\n${jsCode}`;
-    setPreviewContent(combinedCode);
-    setShowPreview(true);
-  }
-
-  // 🚀 REAL AI COMMAND LOGIC 🚀
-  async function handleTerminalSubmit(e) {
-    if (e.key === 'Enter' && terminalInput.trim() !== '') {
-      const userText = terminalInput.trim();
-      setChatHistory(prev => [...prev, { sender: 'user', text: userText }]);
-      setTerminalInput('');
-
-      if (!apiKey) {
-        setChatHistory(prev => [...prev, { sender: 'ai', text: `Oops! Darling pehle upar '⚙️ API Key' button par click karke apni ${activeProvider} ki key toh daal do! 🥺` }]);
-        return;
-      }
-
-      setChatHistory(prev => [...prev, { sender: 'ai', text: `Processing your request using ${activeProvider.toUpperCase()}... Please wait darling ⏳` }]);
-
+    const autoSaveTimer = setInterval(async () => {
       try {
-        // Asli AI API ko call lag rahi hai yahan!
-        const generatedFilesArr = await generate(userText);
-        
-        if (generatedFilesArr && generatedFilesArr.length > 0) {
-          const updatedFiles = { ...files }; // Purani files rakho
-          
-          // Nayi files ko loop karke save karo
-          generatedFilesArr.forEach(f => {
-            updatedFiles[f.filename] = { name: f.filename, language: f.language, value: f.code };
-          });
-          
-          setFiles(updatedFiles); // Monaco Editor ko nayi files de do
-          setChatHistory(prev => [...prev, { sender: 'ai', text: `Boom! 🚀 Maine tumhare liye code generate aur update kar diya hai. "Run Code" daba kar magic dekho!` }]);
-          
-          // Agar HTML file banayi hai toh usko turant open kar do
-          const htmlFile = generatedFilesArr.find(f => f.filename.endsWith('.html'));
-          if (htmlFile) setActiveFileName(htmlFile.filename);
-        }
+        setSaveStatus('🔄 Auto-saving...');
+        await api.saveWorkspace("Ethrix_Workspace_1", filesRef.current);
+        setSaveStatus('✅ Synced to DB');
+        setTimeout(() => setSaveStatus('☁️ Cloud Sync On'), 2000);
       } catch (err) {
-        setChatHistory(prev => [...prev, { sender: 'ai', text: `Oh no! Ek choti si dikkat aa gayi: ${err.message} 🥺` }]);
+        setSaveStatus('❌ Sync Error');
       }
+    }, 10000); 
+    return () => clearInterval(autoSaveTimer);
+  }, []);
+
+  // 🚀 RAM-Friendly Smart Live Previewer
+  const runLivePreview = () => {
+    const currentFiles = filesRef.current;
+    const htmlCode = currentFiles['index.html'] ? currentFiles['index.html'].value : '';
+    const cssCode = currentFiles['style.css'] ? currentFiles['style.css'].value : '';
+    const jsCode = currentFiles['index.js'] ? currentFiles['index.js'].value : '';
+
+    const combinedCode = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <style>${cssCode}</style>
+      </head>
+      <body>
+        ${htmlCode}
+        <script>${jsCode}<\/script>
+      </body>
+      </html>
+    `;
+    setPreviewContent(combinedCode);
+    setActiveTab('preview'); 
+  };
+
+  // ⌨️ KEYBOARD SHORTCUTS (Ctrl+Enter to Run, Ctrl+S to Save)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        setSaveStatus('🔄 Manual Saving...');
+        api.saveWorkspace("Ethrix_Workspace_1", filesRef.current)
+          .then(() => { setSaveStatus('✅ Saved'); setTimeout(() => setSaveStatus('☁️ Cloud Sync On'), 2000); })
+          .catch(() => setSaveStatus('❌ Save Failed'));
+      }
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        runLivePreview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 🖥️ VS CODE REAL TERMINAL (Xterm.js via Cloud)
+  useEffect(() => {
+    if (!terminalRef.current || xtermInstance.current || !window.Terminal) return;
+
+    // Initialize Terminal
+    const term = new window.Terminal({
+      theme: { background: '#1e1e1e', foreground: '#4af626', cursor: '#ffffff' },
+      fontFamily: 'monospace',
+      cursorBlink: true,
+      fontSize: 13
+    });
+    
+    // Auto-fit to container
+    const fitAddon = new window.FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(terminalRef.current);
+    fitAddon.fit();
+    xtermInstance.current = term;
+
+    // Terminal Boot Sequence
+    term.writeln('\x1b[1;36m🤖 Ethrix-Forge Cloud Terminal Initialized!\x1b[0m');
+    term.writeln('Type \x1b[33m"help"\x1b[0m for commands or ask AI to write code.\r\n');
+    term.write('\x1b[1;32m$\x1b[0m ');
+
+    let inputBuffer = '';
+
+    term.onData(async (key) => {
+      // Enter Key Pressed
+      if (key === '\r') {
+        term.writeln('');
+        const command = inputBuffer.trim();
+        inputBuffer = '';
+
+        if (command === '') {
+          term.write('\x1b[1;32m$\x1b[0m ');
+          return;
+        }
+
+        if (command.toLowerCase() === 'clear') {
+          term.clear();
+          term.write('\x1b[1;32m$\x1b[0m ');
+          return;
+        }
+
+        if (command.toLowerCase() === 'help') {
+          term.writeln('  \x1b[36mCtrl + S\x1b[0m      : Cloud Save');
+          term.writeln('  \x1b[36mCtrl + Enter\x1b[0m  : Live Preview');
+          term.writeln('  \x1b[36mclear\x1b[0m         : Clear Terminal');
+          term.writeln('\x1b[33mOr type any prompt to generate code!\x1b[0m');
+          term.write('\x1b[1;32m$\x1b[0m ');
+          return;
+        }
+
+        // Call AI Backend
+        term.writeln(`\x1b[35m⏳ Processing via Cloud Gateway...\x1b[0m`);
+        try {
+          // Note: using your default provider state here
+          const generatedFiles = await api.generateCode(command, "gemini");
+          if (generatedFiles && generatedFiles.length > 0) {
+            const updatedFiles = { ...filesRef.current };
+            generatedFiles.forEach(f => {
+              updatedFiles[f.filename] = { name: f.filename, language: f.language, value: f.code };
+            });
+            setFiles(updatedFiles);
+            term.writeln('\x1b[32m✅ Code Injected! Press Ctrl+Enter to Preview.\x1b[0m');
+          }
+        } catch (err) {
+          term.writeln(`\x1b[31m❌ Error: ${err.message}\x1b[0m`);
+        }
+        term.write('\r\n\x1b[1;32m$\x1b[0m ');
+      } 
+      // Backspace Key Pressed
+      else if (key === '\x7F') {
+        if (inputBuffer.length > 0) {
+          inputBuffer = inputBuffer.slice(0, -1);
+          term.write('\b \b');
+        }
+      } 
+      // Normal Typing
+      else {
+        inputBuffer += key;
+        term.write(key);
+      }
+    });
+
+    // Handle Resize
+    const resizeObserver = new ResizeObserver(() => fitAddon.fit());
+    resizeObserver.observe(terminalRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const handleEditorChange = (value) => {
+    if (activeTab !== 'preview') {
+      setFiles({ ...files, [activeTab]: { ...files[activeTab], value } });
     }
-  }
+  };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#1e1e1e', color: '#cccccc', fontFamily: 'sans-serif' }}>
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#1e1e1e', color: '#ccc', fontFamily: 'sans-serif' }}>
       
-      {/* Left Sidebar */}
+      {/* 📁 Sidebar */}
       <div style={{ width: '250px', backgroundColor: '#252526', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 15px', fontSize: '12px', fontWeight: 'bold', color: '#858585', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>EXPLORER</span>
-          <span onClick={addNewFile} style={{ cursor: 'pointer', color: '#4daafc', fontSize: '18px' }} title="New File">+</span>
-        </div>
+        <div style={{ padding: '15px', fontSize: '12px', fontWeight: 'bold', color: '#858585' }}>EXPLORER</div>
         {Object.keys(files).map((fileName) => (
           <div 
-            key={fileName} onClick={() => setActiveFileName(fileName)}
+            key={fileName} onClick={() => setActiveTab(fileName)}
             style={{ 
-              padding: '8px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between',
-              backgroundColor: fileName === activeFileName ? '#37373d' : 'transparent',
-              borderLeft: fileName === activeFileName ? '2px solid #007acc' : '2px solid transparent',
-              color: fileName === activeFileName ? '#fff' : '#cccccc'
+              padding: '8px 20px', cursor: 'pointer',
+              backgroundColor: activeTab === fileName ? '#37373d' : 'transparent',
+              borderLeft: activeTab === fileName ? '2px solid #007acc' : '2px solid transparent',
+              color: activeTab === fileName ? '#fff' : '#cccccc'
             }}
           >
-            <span>{fileName.endsWith('.js') ? '📄' : fileName.endsWith('.css') ? '🎨' : '🌐'} {fileName}</span>
+            📄 {fileName}
           </div>
         ))}
       </div>
 
-      {/* Right Side - Editor & Terminal */}
+      {/* 💻 Main Editor Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         
-        {/* Top File Tabs aur Actions */}
-        <div style={{ height: '40px', backgroundColor: '#2d2d2d', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '15px' }}>
+        {/* 🛠️ Top Control Bar & Tabs */}
+        <div style={{ backgroundColor: '#2d2d2d', display: 'flex', flexDirection: 'column' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#1e1e1e', borderTop: '2px solid #007acc', color: '#fff' }}>
-            <span style={{ padding: '10px 15px', fontSize: '14px' }}>{activeFileName}</span>
-            <span onClick={downloadFile} style={{ cursor: 'pointer', padding: '0 10px', color: '#4caf50' }} title="Download File">⬇️</span>
-            <span onClick={deleteFile} style={{ cursor: 'pointer', padding: '0 10px', color: '#f44336' }} title="Delete File">🗑️</span>
-          </div>
-          
-          {/* Action Buttons with Provider Selector */}
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Action Tools */}
+          <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px', borderBottom: '1px solid #1e1e1e' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: saveStatus.includes('Auto-saving') ? '#4daafc' : (saveStatus.includes('Synced') ? '#4af626' : '#858585') }}>
+              {saveStatus}
+            </div>
             
-            <select 
-              value={activeProvider} 
-              onChange={(e) => setActiveProvider(e.target.value)}
-              style={{ backgroundColor: '#1e1e1e', color: 'white', border: '1px solid #333', padding: '5px', borderRadius: '4px' }}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <select value={activeProvider} onChange={(e) => setActiveProvider(e.target.value)} style={{ backgroundColor: '#1e1e1e', color: 'white', border: '1px solid #444', padding: '4px 8px', borderRadius: '4px' }}>
+                <option value="gemini">🤖 Gemini</option>
+                <option value="groq">⚡ Groq</option>
+              </select>
+              <button onClick={runLivePreview} style={{ backgroundColor: '#007acc', color: '#fff', border: 'none', padding: '4px 15px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🚀 Run (Ctrl+Enter)</button>
+            </div>
+          </div>
+
+          {/* File Tabs */}
+          <div style={{ display: 'flex', backgroundColor: '#252526', overflowX: 'auto' }}>
+            {Object.keys(files).map(fileName => (
+              <div 
+                key={fileName} onClick={() => setActiveTab(fileName)}
+                style={{
+                  padding: '8px 20px', fontSize: '14px', cursor: 'pointer', borderRight: '1px solid #333',
+                  backgroundColor: activeTab === fileName ? '#1e1e1e' : 'transparent',
+                  color: activeTab === fileName ? '#fff' : '#858585',
+                  borderTop: activeTab === fileName ? '2px solid #007acc' : '2px solid transparent'
+                }}
+              >
+                {fileName}
+              </div>
+            ))}
+            {/* The Dedicated Preview Tab */}
+            <div 
+              onClick={() => setActiveTab('preview')}
+              style={{
+                padding: '8px 20px', fontSize: '14px', cursor: 'pointer', borderRight: '1px solid #333',
+                backgroundColor: activeTab === 'preview' ? '#ffffff' : '#252526',
+                color: activeTab === 'preview' ? '#000000' : '#4daafc',
+                borderTop: activeTab === 'preview' ? '2px solid #4caf50' : '2px solid transparent',
+                fontWeight: 'bold'
+              }}
             >
-              <option value={PROVIDERS.GEMINI}>🤖 Gemini</option>
-              <option value={PROVIDERS.GROQ}>⚡ Groq</option>
-              <option value={PROVIDERS.OPENROUTER}>🌐 OpenRouter</option>
-            </select>
-
-            <button onClick={() => {
-              const key = prompt(`Apni ${activeProvider.toUpperCase()} ki API Key dalo:`, apiKey);
-              if(key) setApiKey(key);
-            }} style={{ backgroundColor: '#555', color: 'white', border: 'none', padding: '5px 15px', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>
-              ⚙️ API Key
-            </button>
-
-            {showPreview ? (
-              <button onClick={() => setShowPreview(false)} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '5px 15px', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>
-                Close Preview ❌
-              </button>
-            ) : (
-              <button onClick={runLivePreview} style={{ backgroundColor: '#4caf50', color: 'white', border: 'none', padding: '5px 15px', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>
-                Run Code 🚀
-              </button>
-            )}
+              👁️ Live Preview
+            </div>
           </div>
         </div>
 
-        {/* Monaco Editor OR Live Preview Window */}
-        <div style={{ flex: 1, backgroundColor: '#ffffff', position: 'relative' }}>
-          {showPreview ? (
-            <iframe title="Live Preview" srcDoc={previewContent} style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#fff' }} />
+        {/* Editor OR Preview Pane */}
+        <div style={{ flex: 1, position: 'relative', backgroundColor: activeTab === 'preview' ? '#fff' : '#1e1e1e' }}>
+          {activeTab === 'preview' ? (
+            <iframe title="Preview" srcDoc={previewContent} style={{ width: '100%', height: '100%', border: 'none' }} />
           ) : (
-            <Editor height="100%" language={activeFile.language} theme="vs-dark" value={activeFile.value} onChange={handleEditorChange} options={{ fontSize: 16, minimap: { enabled: false } }} />
+            <Editor height="100%" language={files[activeTab]?.language || 'plaintext'} theme="vs-dark" value={files[activeTab]?.value || ''} onChange={handleEditorChange} options={{ minimap: { enabled: false } }} />
           )}
         </div>
         
-        {/* Interactive Bottom Terminal Panel */}
-        <div style={{ height: '250px', backgroundColor: '#1e1e1e', borderTop: '1px solid #333', display: 'flex', flexDirection: 'column', fontFamily: 'monospace' }}>
-          
-          <div style={{ flex: 1, padding: '15px', overflowY: 'auto' }}>
-            {chatHistory.map((chat, index) => (
-              <div key={index} style={{ marginBottom: '10px', color: chat.sender === 'ai' ? '#4daafc' : '#4af626' }}>
-                <span style={{ fontWeight: 'bold' }}>{chat.sender === 'ai' ? 'Ethrix-Forge 🤖:' : 'Shantanu 👤:'}</span>
-                <span style={{ marginLeft: '10px', color: '#cccccc', whiteSpace: 'pre-wrap' }}>{chat.text}</span>
-              </div>
-            ))}
-            {isLoading && (
-              <div style={{ color: '#4daafc', fontStyle: 'italic' }}>Ethrix is writing code... ⏳</div>
-            )}
-            <div ref={terminalEndRef} />
-          </div>
-
-          <div style={{ padding: '10px', backgroundColor: '#252526', borderTop: '1px solid #333', display: 'flex' }}>
-            <span style={{ color: '#4af626', marginRight: '10px', marginTop: '2px' }}>➜</span>
-            <input 
-              type="text" value={terminalInput} onChange={(e) => setTerminalInput(e.target.value)} onKeyDown={handleTerminalSubmit}
-              disabled={isLoading}
-              placeholder={isLoading ? "Please wait, AI is generating code..." : "Type 'Create a glowing login page' and press Enter..."}
-              style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: '#fff', outline: 'none', fontFamily: 'monospace', fontSize: '14px' }}
-            />
-          </div>
-
+        {/* Real VS Code Terminal Container */}
+        <div style={{ height: '250px', backgroundColor: '#1e1e1e', borderTop: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '5px 15px', fontSize: '11px', color: '#858585', borderBottom: '1px solid #333', textTransform: 'uppercase', letterSpacing: '1px' }}>TERMINAL</div>
+          {/* Ye div hai jiske andar Xterm.js apna jadoo chalayega */}
+          <div ref={terminalRef} style={{ flex: 1, padding: '10px 15px', overflow: 'hidden' }}></div>
         </div>
 
       </div>
