@@ -861,50 +861,87 @@ class AIGatewayResponse(BaseModel):
 # ── Naya Gemini SDK Import ──
 log = logging.getLogger("ethrix-forge")
 
-# 🚀 Shantanu's Master Fallback List (Top Free-Tier Models)
-FALLBACK_MODELS = [
-    "gemini-1.5-flash",       # Sabse fast aur stable (Top Priority)
-    "gemini-1.5-pro",         # Heavy coding ke liye best
-    "gemini-1.5-flash-8b",    # Naya aur super lightweight model
-    "gemini-2.0-flash",                    # Naye accounts ke liye sabse stable
-    "gemini-2.0-flash-lite-preview-02-05", # 2.0 ka lite version
-    "gemini-1.0-pro"          # Sabse purana aur reliable backup
+# 🚀 Shantanu's Ultimate Master Fallback Lists
+GEMINI_MODELS = [
+    "gemini-2.5-flash",                    # 🔥 Sabse fast aur powerful! (Top Priority)
+    "gemini-2.0-flash", 
+    "gemini-2.0-flash-lite-preview-02-05", 
+    "gemini-1.5-flash
+]
+OPENROUTER_MODELS = [
+    "qwen/qwen-2.5-coder-32b-instruct:free", # Free aur best coding
+    "meta-llama/llama-3.3-70b-instruct:free"
+]
+GROQ_MODELS = [
+    "qwen-2.5-coder-32b", 
+    "llama-3.3-70b-versatile"
 ]
 
+# Note: Maine naam _call_gemini_gateway hi rakha hai taaki tumhara baaki code na tute,
+# par ab yeh ek MASTER GATEWAY ban chuka hai! 😎
 async def _call_gemini_gateway(prompt: str, requested_model: str) -> str:
-    """Bulletproof Gemini Call with Shantanu's Fallback Engine"""
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is missing!")
-
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    """The God Mode AI Gateway: Gemini -> OpenRouter -> Groq"""
     full_prompt = f"{SYSTEM_PROMPT}\n\nUser Request:\n{prompt}"
     last_error = ""
 
-    # Ek-ek karke saare models try karenge jab tak success na mile!
-    for current_model in FALLBACK_MODELS:
-        log.info(f"🔄 Trying Gemini model: {current_model}...")
-        try:
-            def sync_gemini_call(m):
-                return client.models.generate_content(
-                    model=m, 
-                    contents=full_prompt
-                )
-                
-            response = await asyncio.to_thread(sync_gemini_call, current_model)
-            
-            log.info(f"✅ Gemini Success with {current_model}! Raw Response: {response.text[:100]}...") 
-            return response.text
+    # 🟢 STEP 1: GEMINI (First Priority)
+    if GEMINI_API_KEY:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        for model in GEMINI_MODELS:
+            log.info(f"🔄 Trying Gemini: {model}...")
+            try:
+                def sync_call(m):
+                    return client.models.generate_content(model=m, contents=full_prompt)
+                response = await asyncio.to_thread(sync_call, model)
+                log.info(f"✅ Success with Gemini {model}!")
+                return response.text
+            except Exception as e:
+                log.warning(f"⚠️ Gemini {model} failed: {str(e)}")
+                last_error = f"Gemini Error: {str(e)}"
 
-        except Exception as e:
-            # Agar fail hua, toh error log karke agla model try karega
-            error_msg = str(e)
-            log.warning(f"⚠️ Model {current_model} failed: {error_msg}")
-            last_error = error_msg
-            continue # Agle model par jao
+    # 🔵 STEP 2: OPENROUTER (Second Priority)
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    if OPENROUTER_API_KEY:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for model in OPENROUTER_MODELS:
+                log.info(f"🔄 Trying OpenRouter: {model}...")
+                try:
+                    res = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+                        json={"model": model, "messages": [{"role": "user", "content": full_prompt}]}
+                    )
+                    res.raise_for_status()
+                    data = res.json()
+                    log.info(f"✅ Success with OpenRouter {model}!")
+                    return data["choices"][0]["message"]["content"]
+                except Exception as e:
+                    log.warning(f"⚠️ OpenRouter {model} failed: {str(e)}")
+                    last_error = f"OpenRouter Error: {str(e)}"
 
-    # Agar saare 5 models fail ho gaye (jo ki almost impossible hai)
-    log.error(f"❌ ALL GEMINI MODELS FAILED. Last error: {last_error}")
-    raise HTTPException(status_code=502, detail=f"All Gemini models exhausted. Last Error: {last_error}")
+    # 🟠 STEP 3: GROQ (Third Priority - Flash Speed Backup)
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY") # Agar env variable ka naam GROQ_API_KEY hai
+    if GROQ_API_KEY:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for model in GROQ_MODELS:
+                log.info(f"🔄 Trying Groq: {model}...")
+                try:
+                    res = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                        json={"model": model, "messages": [{"role": "user", "content": full_prompt}]}
+                    )
+                    res.raise_for_status()
+                    data = res.json()
+                    log.info(f"✅ Success with Groq {model}!")
+                    return data["choices"][0]["message"]["content"]
+                except Exception as e:
+                    log.warning(f"⚠️ Groq {model} failed: {str(e)}")
+                    last_error = f"Groq Error: {str(e)}"
+
+    # ❌ FINAL ERROR: Agar duniya ke teeno bade AI down ho jayein (jo ki impossible hai)
+    log.error(f"❌ ALL AI PROVIDERS FAILED! Last error: {last_error}")
+    raise HTTPException(status_code=502, detail="All AI limits exhausted! Please check logs.")
 
 
 async def _call_groq_gateway(prompt: str, model: str) -> str:
