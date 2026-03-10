@@ -311,8 +311,22 @@ function App() {
             </button>
           </div>
 
-          <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative' }}>
-             <Editor height="100%" language={files[activeTab]?.language || 'plaintext'} theme="vs-dark" value={files[activeTab]?.value || ''} onChange={(val) => setFiles({ ...files, [activeTab]: { ...files[activeTab], value: val } })} options={{ minimap: { enabled: false }, fontSize: 14 }} />
+          {/* ✨ FIXED EDITOR PANE (Scroll Bug Fixed) ✨ */}
+          <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative', overflow: 'hidden' }}>
+             <Editor 
+               height="100%" 
+               language={files[activeTab]?.language || 'plaintext'} 
+               theme="vs-dark" 
+               value={files[activeTab]?.value || ''} 
+               onChange={(val) => setFiles({ ...files, [activeTab]: { ...files[activeTab], value: val } })} 
+               options={{ 
+                 minimap: { enabled: false }, 
+                 fontSize: 14,
+                 automaticLayout: true,         // 🚀 YEH HAI ASLI JADOO (Fixes Canvas Bug)
+                 scrollBeyondLastLine: false,   // Extra khali space hatane ke liye
+                 wordWrap: 'on'                 // Code screen ke bahar na jaye
+               }} 
+             />
           </div>
           
           {/* ✨ FIXED TERMINAL PANE ✨ */}
