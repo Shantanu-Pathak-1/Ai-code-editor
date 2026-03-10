@@ -6,7 +6,7 @@ export const api = {
   // apiService.js ke andar bas yeh function update karna hai
   generateCode: async (prompt, existingFiles, provider) => {
     // Yahan tumne jo apna Hugging Face space url dala hai, wahi rehne dena
-    const API_URL = "https://YOUR-HUGGINGFACE-SPACE-URL.hf.space"; 
+    const API_URL = "https://shantanupathak94-ai-code-editor.hf.space"; 
     
     try {
       // DHYAAN DO: Naya endpoint aur naya body format
