@@ -5,28 +5,32 @@ export const api = {
   // 1. AI Generation (Secure Gateway)
   // apiService.js ke andar bas yeh function update karna hai
   generateCode: async (prompt, existingFiles, provider) => {
-    // Apne Hugging Face space ka link daalna yahan
+    // Yahan tumne jo apna Hugging Face space url dala hai, wahi rehne dena
     const API_URL = "https://YOUR-HUGGINGFACE-SPACE-URL.hf.space"; 
+    
     try {
+      // DHYAAN DO: Naya endpoint aur naya body format
       const response = await fetch(`${API_URL}/api/agent/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: prompt,
-          existing_files: existingFiles, // ✨ Asli Jadoo: Ab saari files context mein jayengi!
+          existing_files: existingFiles, // Ab AI ko tumhari files dikhengi!
           model_preference: provider || "gemini"
         })
       });
+      
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || "AI Gateway Error");
       }
+      
       const data = await response.json();
-      return data.files; // Backend ab direct 'files' array bhejega
+      return data.files; // Naya return format
     } catch (error) {
       throw error;
     }
-  }
+  },
 
   // 2. MongoDB Workspace Sync
   saveWorkspace: async (name, filesObject) => {

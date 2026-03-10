@@ -8,13 +8,16 @@ const getFileIcon = (filename) => {
   if (filename.endsWith('.js') || filename.endsWith('.jsx')) return <i className="fab fa-js" style={{ color: '#f7df1e' }}></i>;
   if (filename.endsWith('.json')) return <i className="fas fa-brackets-curly" style={{ color: '#cb3837' }}></i>;
   if (filename.endsWith('.py')) return <i className="fab fa-python" style={{ color: '#306998' }}></i>;
+  if (filename.includes('/')) return <i className="fas fa-folder-open" style={{ color: '#e3b341' }}></i>; 
   return <i className="fas fa-file-code" style={{ color: '#8b949e' }}></i>;
 };
 
 const getLanguage = (filename) => {
   if (filename.endsWith('.html')) return 'html';
   if (filename.endsWith('.css')) return 'css';
-  if (filename.endsWith('.js')) return 'javascript';
+  if (filename.endsWith('.js') || filename.endsWith('.jsx')) return 'javascript';
+  if (filename.endsWith('.json')) return 'json';
+  if (filename.endsWith('.py')) return 'python';
   return 'plaintext';
 };
 
@@ -22,30 +25,25 @@ function App() {
   const [files, setFiles] = useState({
     'index.html': { name: 'index.html', language: 'html', value: '\n<h1>Hello Shantanu ✨</h1>' },
     'style.css': { name: 'style.css', language: 'css', value: '/* Type your CSS here */\nbody {\n  background-color: #1e1e1e;\n  color: white;\n}' },
-    'script.js': { name: 'script.js', language: 'javascript', value: 'console.log("Ethrix Cloud Terminal Active!");' }
+    'script.js': { name: 'script.js', language: 'javascript', value: 'console.log("Ethrix God Mode Active!");' }
   });
   
   const [activeTab, setActiveTab] = useState('index.html'); 
   const [saveStatus, setSaveStatus] = useState('☁️ Synced');
   
-  // UI Toggles
-  const [showTerminal, setShowTerminal] = useState(true);
-  const [isTerminalMinimized, setIsTerminalMinimized] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const [showExplorer, setShowExplorer] = useState(true); 
   const [websiteTheme, setWebsiteTheme] = useState('Auto Theme');
-  const [activeMode, setActiveMode] = useState('Copilot Mode');
+  const [activeMode, setActiveMode] = useState('Agentic Mode');
 
-  // File Creation & Rename States
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [renamingFile, setRenamingFile] = useState(null);
   const [renameInput, setRenameInput] = useState('');
 
-  // AI Chat Workflow States
-  const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: 'Hi Shantanu! 🖤 Main Shanvika hu. Aaj kis theme ki website banani hai?' }]);
+  const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: 'Hi Shantanu! 🖤 Main Shanvika hu. Agentic Workflow is 100% online. Kya banana hai aaj?' }]);
   const [aiInput, setAiInput] = useState('');
   const [aiWorkflowStatus, setAiWorkflowStatus] = useState(''); 
-  const [isTyping, setIsTyping] = useState(false);
   
   const filesRef = useRef(files); 
   const terminalRef = useRef(null);
@@ -121,7 +119,6 @@ function App() {
     if (activeTab === fileName) setActiveTab(Object.keys(newFiles)[0] || '');
   };
 
-  // 🚀 THE NEW AGENTIC WORKFLOW SUBMIT LOGIC 🚀
   const handleAISubmit = async (e) => {
     if (e.key === 'Enter' && aiInput.trim() !== '') {
       const prompt = aiInput.trim();
@@ -130,35 +127,29 @@ function App() {
       setAiWorkflowStatus('🧠 Reading context & planning architecture...');
 
       try {
-        // ✨ Context Builder: Saari current files ko array mein convert kar rahe hain
         const existingFilesArray = Object.values(filesRef.current).map(f => ({
           filename: f.name,
-          language: f.language,
+          language: f.language || 'plaintext',
           code: f.value
         }));
         
-        const agenticPrompt = `Theme: ${websiteTheme}. Mode: ${activeMode}. User Request: ${prompt}`;
-
-        // apiService mein naya update bhej rahe hain
-        const generatedFiles = await api.generateCode(agenticPrompt, existingFilesArray, "gemini");
+        const generatedFiles = await api.generateCode(prompt, existingFilesArray, "gemini");
         
         if (generatedFiles && generatedFiles.length > 0) {
-          setAiWorkflowStatus(`📄 Writing code in ${generatedFiles.length} files...`);
+          setAiWorkflowStatus(`📄 Updating ${generatedFiles.length} files...`);
           
           const updatedFiles = { ...filesRef.current };
           generatedFiles.forEach(f => {
-            updatedFiles[f.filename] = { name: f.filename, language: f.language || 'plaintext', value: f.code };
+            updatedFiles[f.filename] = { name: f.filename, language: getLanguage(f.filename), value: f.code };
           });
           
           setTimeout(() => {
             setFiles(updatedFiles);
-            // Open HTML or the first changed file
             const fileToOpen = generatedFiles.find(f => f.filename.endsWith('.html'))?.filename || generatedFiles[0].filename;
             setActiveTab(fileToOpen);
-            
             if (!showExplorer) setShowExplorer(true);
             setAiWorkflowStatus(''); 
-            setChatMessages(prev => [...prev, { role: 'ai', text: `✅ Maine ${generatedFiles.length} file(s) mein code update kar diya hai! ✨ Press Run in New Tab to check.` }]);
+            setChatMessages(prev => [...prev, { role: 'ai', text: `✅ Code generated beautifully! ✨ Press Run in New Tab to see it. Pata hai, main changes sirf unhi files mein karti hu jinki zarurat hoti hai!` }]);
           }, 1000);
         }
       } catch (err) {
@@ -168,37 +159,23 @@ function App() {
     }
   };
 
-  // ✨ FIX 1: Terminal Expand/Minimize Logic 
-  const toggleTerminalSize = () => {
-    setIsTerminalMinimized(!isTerminalMinimized);
-  };
-
-  // Jab terminal minimize se wapas bada ho, usko resize karo taaki UI na fate
-  useEffect(() => {
-    if (!isTerminalMinimized && fitAddonRef.current) {
-      setTimeout(() => {
-        fitAddonRef.current.fit();
-      }, 350); // CSS transition ke baad resize
-    }
-  }, [isTerminalMinimized]);
-
   const clearTerminal = () => { 
     if (xtermInstance.current) { xtermInstance.current.clear(); xtermInstance.current.write('user@ethrix:~$ '); } 
   };
 
-  // ✨ FIX 2: Terminal ko wapas laane ka function
-  const reopenTerminal = () => {
-    setShowTerminal(true);
-    setIsTerminalMinimized(false);
-  };
+  useEffect(() => {
+    if (showTerminal && fitAddonRef.current) {
+      setTimeout(() => { fitAddonRef.current.fit(); }, 50); 
+    }
+  }, [showTerminal]);
 
-  // Real Terminal Lifecycle
   useEffect(() => {
     if (!showTerminal || !terminalRef.current) return;
+    // Check if CDN loaded
+    if (!window.Terminal || !window.FitAddon) return; 
     
-    // Agar terminal already nahi bana hai toh naya banao
     if (!xtermInstance.current) {
-      const term = new window.Terminal({ theme: { background: '#0d1117', foreground: '#c9d1d9' }, fontFamily: '"Fira Code", monospace', fontSize: 13 });
+      const term = new window.Terminal({ theme: { background: '#0d1117', foreground: '#c9d1d9', cursor: '#58a6ff' }, fontFamily: '"Fira Code", monospace', fontSize: 13, cursorBlink: true });
       const fitAddon = new window.FitAddon.FitAddon();
       fitAddonRef.current = fitAddon;
 
@@ -207,7 +184,7 @@ function App() {
       fitAddon.fit();
       xtermInstance.current = term;
 
-      term.writeln('\x1b[1;32mEthrix Local Terminal Started.\x1b[0m');
+      term.writeln('\x1b[1;36mEthrix Secure Cloud Terminal 1.0\x1b[0m');
       term.write('user@ethrix:~$ ');
 
       let inputBuffer = '';
@@ -223,16 +200,12 @@ function App() {
         } else { inputBuffer += key; term.write(key); }
       });
 
-      const resizeObserver = new ResizeObserver(() => {
-        if (fitAddonRef.current && !isTerminalMinimized) fitAddonRef.current.fit();
-      });
+      const resizeObserver = new ResizeObserver(() => { if (fitAddonRef.current) fitAddonRef.current.fit(); });
       resizeObserver.observe(terminalRef.current);
-      
       return () => resizeObserver.disconnect();
     }
   }, [showTerminal]);
 
-  // Cleanup jab terminal close (X) dabaya jaye
   useEffect(() => {
     if (!showTerminal && xtermInstance.current) {
       xtermInstance.current.dispose();
@@ -244,20 +217,17 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#0d1117', color: '#c9d1d9', fontFamily: 'sans-serif', overflow: 'hidden' }}>
       
-      {/* 🚀 MAIN CONTENT AREA (3 Panels) */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
-        {/* 📁 LEFT PANE: Smart File Explorer */}
+        {/* EXPLORER */}
         {showExplorer && (
-          <div style={{ width: '250px', backgroundColor: '#010409', borderRight: '1px solid #30363d', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '250px', backgroundColor: '#010409', borderRight: '1px solid #30363d', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             <div style={{ padding: '12px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #30363d', backgroundColor: '#161b22' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#8b949e', letterSpacing: '1px' }}>EXPLORER</span>
               <div style={{ display: 'flex', gap: '12px', color: '#c9d1d9', fontSize: '13px' }}>
-                <i className="fas fa-file-plus" onClick={() => setIsCreatingFile(true)} style={{ cursor: 'pointer' }} title="New File"></i>
-                <i className="fas fa-folder-plus" onClick={() => alert("Folder logic connecting soon!")} style={{ cursor: 'pointer' }} title="New Folder"></i>
+                <i className="fas fa-file-plus" onClick={() => setIsCreatingFile(true)} style={{ cursor: 'pointer' }} title="New File/Folder"></i>
                 <i className="fas fa-upload" onClick={() => alert("Upload connected soon!")} style={{ cursor: 'pointer' }} title="Upload"></i>
                 <i className="fas fa-download" onClick={() => alert("Download connected soon!")} style={{ cursor: 'pointer' }} title="Download"></i>
-                {/* ✨ FIX 3: GitHub Icon Wapas Aa Gaya! ✨ */}
                 <i className="fab fa-github" onClick={() => alert("GitHub Sync soon!")} style={{ cursor: 'pointer' }} title="GitHub"></i>
               </div>
             </div>
@@ -266,7 +236,7 @@ function App() {
               {isCreatingFile && (
                 <div style={{ padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#161b22', borderRadius: '4px', marginBottom: '5px' }}>
                   <i className="fas fa-file" style={{ color: '#8b949e' }}></i>
-                  <input autoFocus type="text" value={newFileName} onChange={(e) => setNewFileName(e.target.value)} onKeyDown={handleCreateFile} onBlur={() => setIsCreatingFile(false)} placeholder="name.js" style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: '13px' }} />
+                  <input autoFocus type="text" value={newFileName} onChange={(e) => setNewFileName(e.target.value)} onKeyDown={handleCreateFile} onBlur={() => setIsCreatingFile(false)} placeholder="components/nav.js" style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: '13px' }} />
                 </div>
               )}
               
@@ -277,7 +247,7 @@ function App() {
                     {renamingFile === fileName ? (
                       <input autoFocus type="text" value={renameInput} onChange={(e) => setRenameInput(e.target.value)} onKeyDown={(e) => handleRenameFile(e, fileName)} onBlur={() => setRenamingFile(null)} style={{ background: '#161b22', border: '1px solid #58a6ff', color: '#fff', outline: 'none', width: '100%', fontSize: '13px', padding: '2px 4px' }} />
                     ) : (
-                      <span style={{ fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fileName}</span>
+                      <span style={{ fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={fileName}>{fileName}</span>
                     )}
                   </div>
                   {renamingFile !== fileName && (
@@ -292,26 +262,25 @@ function App() {
           </div>
         )}
 
-        {/* 💻 MIDDLE PANE: Editor & Terminal */}
+        {/* MIDDLE PANE */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           
-          <div style={{ height: '45px', backgroundColor: '#0d1117', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div onClick={() => setShowExplorer(!showExplorer)} style={{ padding: '0 15px 0 0', cursor: 'pointer', color: showExplorer ? '#58a6ff' : '#8b949e', borderRight: '1px solid #30363d', marginRight: '10px' }}>
+          <div style={{ height: '45px', backgroundColor: '#0d1117', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', overflowX: 'auto' }}>
+              <div onClick={() => setShowExplorer(!showExplorer)} style={{ padding: '0 15px 0 0', cursor: 'pointer', color: showExplorer ? '#58a6ff' : '#8b949e', borderRight: '1px solid #30363d', marginRight: '10px', flexShrink: 0 }}>
                 <i className="fas fa-bars" style={{ fontSize: '15px' }}></i>
               </div>
               {Object.keys(files).map(fileName => (
-                <div key={fileName} onClick={() => setActiveTab(fileName)} style={{ padding: '10px 20px', fontSize: '13px', cursor: 'pointer', backgroundColor: activeTab === fileName ? '#161b22' : 'transparent', borderTop: activeTab === fileName ? '2px solid #58a6ff' : '2px solid transparent', color: activeTab === fileName ? '#c9d1d9' : '#8b949e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {getFileIcon(fileName)} {fileName}
+                <div key={fileName} onClick={() => setActiveTab(fileName)} style={{ padding: '10px 15px', fontSize: '13px', cursor: 'pointer', backgroundColor: activeTab === fileName ? '#161b22' : 'transparent', borderTop: activeTab === fileName ? '2px solid #58a6ff' : '2px solid transparent', color: activeTab === fileName ? '#c9d1d9' : '#8b949e', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                  {getFileIcon(fileName)} {fileName.split('/').pop()}
                 </div>
               ))}
             </div>
-            <button onClick={runLivePreview} style={{ backgroundColor: '#238636', color: '#fff', border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
-               <i className="fas fa-external-link-alt" style={{ marginRight: '6px' }}></i> Run in New Tab
+            <button onClick={runLivePreview} style={{ backgroundColor: '#238636', color: '#fff', border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', flexShrink: 0, marginLeft: '10px' }}>
+               <i className="fas fa-external-link-alt" style={{ marginRight: '6px' }}></i> Run 
             </button>
           </div>
 
-          {/* ✨ FIXED EDITOR PANE (Scroll Bug Fixed) ✨ */}
           <div style={{ flex: 1, backgroundColor: '#0d1117', position: 'relative', overflow: 'hidden' }}>
              <Editor 
                height="100%" 
@@ -319,56 +288,42 @@ function App() {
                theme="vs-dark" 
                value={files[activeTab]?.value || ''} 
                onChange={(val) => setFiles({ ...files, [activeTab]: { ...files[activeTab], value: val } })} 
-               options={{ 
-                 minimap: { enabled: false }, 
-                 fontSize: 14,
-                 automaticLayout: true,         // 🚀 YEH HAI ASLI JADOO (Fixes Canvas Bug)
-                 scrollBeyondLastLine: false,   // Extra khali space hatane ke liye
-                 wordWrap: 'on'                 // Code screen ke bahar na jaye
-               }} 
+               options={{ minimap: { enabled: false }, fontSize: 14, automaticLayout: true, wordWrap: 'on' }} 
              />
           </div>
           
-          {/* ✨ FIXED TERMINAL PANE ✨ */}
+          {/* TERMINAL */}
           {showTerminal && (
-            <div style={{ height: isTerminalMinimized ? '35px' : '220px', transition: 'height 0.3s ease', backgroundColor: '#010409', borderTop: '1px solid #30363d', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '8px 15px', fontSize: '11px', color: '#8b949e', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#161b22', userSelect: 'none' }}>
+            <div style={{ height: '250px', backgroundColor: '#010409', borderTop: '1px solid #30363d', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <div style={{ height: '35px', padding: '0 15px', fontSize: '11px', color: '#8b949e', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#161b22', userSelect: 'none' }}>
                 <div style={{ display: 'flex', gap: '15px' }}>
-                  <span style={{ borderBottom: isTerminalMinimized ? 'none' : '1px solid #58a6ff', color: '#c9d1d9', fontWeight: 'bold' }}>TERMINAL</span>
-                  {!isTerminalMinimized && <span style={{ cursor: 'pointer' }}>OUTPUT</span>}
+                  <span style={{ color: '#c9d1d9', fontWeight: 'bold' }}>TERMINAL</span>
+                  <span style={{ cursor: 'pointer' }}>OUTPUT</span>
                 </div>
-                
                 <div style={{ display: 'flex', gap: '15px', fontSize: '14px' }}>
-                  <i className="fas fa-trash-alt" onClick={clearTerminal} style={{ cursor: 'pointer', color: '#c9d1d9' }} title="Clear Terminal"></i>
-                  <i className={`fas ${isTerminalMinimized ? 'fa-chevron-up' : 'fa-chevron-down'}`} onClick={toggleTerminalSize} style={{ cursor: 'pointer', color: '#c9d1d9' }} title={isTerminalMinimized ? "Expand" : "Minimize"}></i>
+                  <i className="fas fa-trash-alt" onClick={clearTerminal} style={{ cursor: 'pointer', color: '#c9d1d9' }} title="Clear"></i>
                   <i className="fas fa-times" onClick={() => setShowTerminal(false)} style={{ cursor: 'pointer', color: '#c9d1d9' }} title="Close"></i>
                 </div>
               </div>
-              
-              {/* CSS Hack: Height 0 instead of display:none preserves Canvas memory! */}
-              <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: isTerminalMinimized ? 0 : 1, pointerEvents: isTerminalMinimized ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
-                    <div ref={terminalRef} style={{ width: '100%', height: '100%', padding: '10px' }}></div>
-                 </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                 <div ref={terminalRef} style={{ width: '100%', height: '100%', padding: '10px' }}></div>
               </div>
             </div>
           )}
         </div>
 
-        {/* 🤖 RIGHT PANE: AI Chat Panel */}
-        <div style={{ width: '320px', backgroundColor: '#010409', borderLeft: '1px solid #30363d', display: 'flex', flexDirection: 'column' }}>
+        {/* AI PANEL */}
+        <div style={{ width: '320px', backgroundColor: '#010409', borderLeft: '1px solid #30363d', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div style={{ padding: '15px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(45deg, #ff00cc, #3333ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>S</div>
               <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#c9d1d9' }}>Shanvika AI</span>
             </div>
-            
             <select value={websiteTheme} onChange={(e) => setWebsiteTheme(e.target.value)} style={{ backgroundColor: '#161b22', color: '#8b949e', border: '1px solid #30363d', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '11px', cursor: 'pointer' }}>
               <option>Auto Theme</option>
               <option>Professional</option>
               <option>Sci-Fi</option>
               <option>Fantasy</option>
-              <option>Minimalist</option>
             </select>
           </div>
 
@@ -383,7 +338,6 @@ function App() {
                 </div>
               </div>
             ))}
-            
             {aiWorkflowStatus && (
               <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
                 <div style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px', backgroundColor: 'rgba(88, 166, 255, 0.1)', color: '#58a6ff', border: '1px solid rgba(88, 166, 255, 0.2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -396,7 +350,7 @@ function App() {
 
           <div style={{ padding: '15px', borderTop: '1px solid #30363d', backgroundColor: '#0d1117' }}>
             <div style={{ position: 'relative' }}>
-              <textarea value={aiInput} onChange={(e) => setAiInput(e.target.value)} onKeyDown={handleAISubmit} disabled={!!aiWorkflowStatus} placeholder="E.g., Make a portfolio website..." style={{ width: '100%', height: '80px', backgroundColor: '#010409', border: '1px solid #30363d', borderRadius: '8px', color: '#c9d1d9', padding: '10px', fontSize: '13px', resize: 'none', outline: 'none', opacity: aiWorkflowStatus ? 0.5 : 1 }} />
+              <textarea value={aiInput} onChange={(e) => setAiInput(e.target.value)} onKeyDown={handleAISubmit} disabled={!!aiWorkflowStatus} placeholder="Request a new site or changes..." style={{ width: '100%', height: '80px', backgroundColor: '#010409', border: '1px solid #30363d', borderRadius: '8px', color: '#c9d1d9', padding: '10px', fontSize: '13px', resize: 'none', outline: 'none', opacity: aiWorkflowStatus ? 0.5 : 1 }} />
               <button onClick={() => handleAISubmit({ key: 'Enter' })} disabled={!!aiWorkflowStatus || !aiInput.trim()} style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'transparent', border: 'none', color: '#58a6ff', cursor: 'pointer', fontSize: '16px', opacity: (aiWorkflowStatus || !aiInput.trim()) ? 0.5 : 1 }}>
                 <i className="fas fa-paper-plane"></i>
               </button>
@@ -406,15 +360,12 @@ function App() {
 
       </div>
 
-      {/* 🚀 VS CODE STYLE BOTTOM STATUS BAR */}
-      <div style={{ height: '24px', backgroundColor: '#010409', borderTop: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px', fontSize: '11px', color: '#c9d1d9', zIndex: 10 }}>
+      {/* STATUS BAR */}
+      <div style={{ height: '24px', backgroundColor: '#010409', borderTop: '1px solid #30363d', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px', fontSize: '11px', color: '#c9d1d9', zIndex: 10, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-          
-          {/* ✨ Yahan Se Terminal Wapas Aayega ✨ */}
-          <div onClick={reopenTerminal} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: showTerminal ? '#58a6ff' : '#8b949e', transition: 'color 0.2s' }} title="Reopen Terminal">
+          <div onClick={() => setShowTerminal(!showTerminal)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: showTerminal ? '#58a6ff' : '#8b949e', transition: 'color 0.2s' }} title="Toggle Terminal">
             <i className="fas fa-terminal"></i> Terminal
           </div>
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: saveStatus.includes('Error') ? '#f85149' : '#3fb950' }}>
             <i className="fas fa-cloud"></i> {saveStatus}
           </div>
@@ -423,8 +374,7 @@ function App() {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <select value={activeMode} onChange={(e) => setActiveMode(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#8b949e', outline: 'none', fontSize: '11px', cursor: 'pointer' }}>
             <option>Copilot Mode</option>
-            <option>God Mode (Auto)</option>
-            <option>Debug Mode</option>
+            <option>Agentic Mode</option>
           </select>
           <div><i className="fas fa-code-branch" style={{ marginRight: '5px' }}></i> main</div>
           <div><i className="fas fa-check-double" style={{ marginRight: '5px', color: '#3fb950' }}></i> Ethrix Prettier</div>
