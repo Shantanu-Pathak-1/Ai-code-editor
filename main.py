@@ -60,7 +60,7 @@ from google.auth.transport.requests import Request as GoogleRequest
 from google import genai
 import asyncio
 import logging
-
+from ai_gateway import AgentRequest, AgentResponse, run_agentic_workflow
 # ─────────────────────────────────────────────────────────────────────────────
 # LOGGING
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1035,58 +1035,10 @@ _GATEWAY_DEFAULT_MODELS = {
 
 # ── Main Gateway Endpoint ─────────────────────────────────────────────────────
 
-@app.post("/ai/generate", response_model=AIGatewayResponse, tags=["AI Gateway"])
-async def ai_generate(payload: AIGatewayRequest):
-    """
-    Secure AI code-generation proxy.
-    The frontend sends a prompt; the backend appends the real API key and
-    forwards to Gemini or Groq. Returns a parsed FileObject array.
-    """
-    provider = payload.provider.lower()
-    model    = payload.model or _GATEWAY_DEFAULT_MODELS.get(provider)
-
-    if not model:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown provider '{provider}'. Use 'gemini' or 'groq'."
-        )
-
-    log.info(f"AI Gateway request: provider={provider}, model={model}, prompt_len={len(payload.prompt)}")
-
-    if provider == "gemini":
-        raw = await _call_gemini_gateway(payload.prompt, model)
-    elif provider == "groq":
-        raw = await _call_groq_gateway(payload.prompt, model)
-    else:
-        raise HTTPException(status_code=400, detail=f"Provider '{provider}' is not supported by the gateway.")
-
-    files = _parse_gateway_response(raw, provider)
-
-    return AIGatewayResponse(
-        files=files,
-        raw_response=raw,
-        provider=provider,
-        model=model,
-    )
-
-
-@app.get("/ai/providers", tags=["AI Gateway"])
-async def ai_providers():
-    """
-    Returns which providers are configured on the server (without exposing keys).
-    The frontend uses this to show/hide provider options.
-    """
-    return {
-        "gemini": {
-            "available": bool(GEMINI_API_KEY),
-            "models":    ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"],
-        },
-        "groq": {
-            "available": bool(GROQ_API_KEY),
-            "models":    ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-        },
-    }
-
+# Naya Agentic Endpoint
+@app.post("/api/agent/generate", response_model=AgentResponse)
+async def agent_generate(request: AgentRequest):
+    return await run_agentic_workflow(request)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # HEALTH & ROOT

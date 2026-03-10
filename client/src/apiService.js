@@ -3,15 +3,30 @@ const BACK_URL = "https://shantanupathak94-ai-code-editor.hf.space";
 
 export const api = {
   // 1. AI Generation (Secure Gateway)
-  generateCode: async (prompt, provider) => {
-    const res = await fetch(`${BACK_URL}/ai/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, provider })
-    });
-    if (!res.ok) throw new Error("AI Backend Error");
-    return (await res.json()).files;
-  },
+  // apiService.js ke andar bas yeh function update karna hai
+  generateCode: async (prompt, existingFiles, provider) => {
+    // Apne Hugging Face space ka link daalna yahan
+    const API_URL = "https://YOUR-HUGGINGFACE-SPACE-URL.hf.space"; 
+    try {
+      const response = await fetch(`${API_URL}/api/agent/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          existing_files: existingFiles, // ✨ Asli Jadoo: Ab saari files context mein jayengi!
+          model_preference: provider || "gemini"
+        })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "AI Gateway Error");
+      }
+      const data = await response.json();
+      return data.files; // Backend ab direct 'files' array bhejega
+    } catch (error) {
+      throw error;
+    }
+  }
 
   // 2. MongoDB Workspace Sync
   saveWorkspace: async (name, filesObject) => {
