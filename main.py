@@ -866,6 +866,7 @@ FALLBACK_MODELS = [
     "gemini-1.5-flash",       # Sabse fast aur stable (Top Priority)
     "gemini-1.5-pro",         # Heavy coding ke liye best
     "gemini-1.5-flash-8b",    # Naya aur super lightweight model
+    "gemini-2.0-flash",                    # Naye accounts ke liye sabse stable
     "gemini-2.0-flash-lite-preview-02-05", # 2.0 ka lite version
     "gemini-1.0-pro"          # Sabse purana aur reliable backup
 ]
