@@ -249,13 +249,27 @@ function App() {
         </div>
 
         {/* Editor OR Preview Pane */}
-        <div style={{ flex: 1, position: 'relative', backgroundColor: activeTab === 'preview' ? '#fff' : '#1e1e1e' }}>
-          {activeTab === 'preview' ? (
-            <iframe title="Preview" srcDoc={previewContent} style={{ width: '100%', height: '100%', border: 'none' }} />
-          ) : (
-            <Editor height="100%" language={files[activeTab]?.language || 'plaintext'} theme="vs-dark" value={files[activeTab]?.value || ''} onChange={handleEditorChange} options={{ minimap: { enabled: false } }} />
-          )}
-        </div>
+{/* Editor OR Preview Pane */}
+<div style={{ flex: 1, position: 'relative', backgroundColor: activeTab === 'preview' ? '#fff' : '#1e1e1e' }}>
+  {activeTab === 'preview' ? (
+    <iframe 
+      title="Preview" 
+      srcDoc={`
+        <!DOCTYPE html>
+        <html>
+          <head><style>${files['style.css']?.value || ''}</style></head>
+          <body>
+            ${files['index.html']?.value || ''}
+            <script>${files['index.js']?.value || ''}<\/script>
+          </body>
+        </html>
+      `} 
+      style={{ width: '100%', height: '100%', border: 'none' }} 
+    />
+  ) : (
+    <Editor height="100%" language={files[activeTab]?.language || 'plaintext'} theme="vs-dark" value={files[activeTab]?.value || ''} onChange={handleEditorChange} options={{ minimap: { enabled: false } }} />
+  )}
+</div>
         
         {/* Real VS Code Terminal Container */}
         <div style={{ height: '250px', backgroundColor: '#1e1e1e', borderTop: '1px solid #333', display: 'flex', flexDirection: 'column' }}>

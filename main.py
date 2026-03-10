@@ -57,6 +57,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.auth.transport.requests import Request as GoogleRequest
+from google import genai
+import asyncio
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LOGGING
@@ -855,36 +857,33 @@ class AIGatewayResponse(BaseModel):
     model:        str
 
 
-# ── Internal AI Callers ───────────────────────────────────────────────────────
+# ── Internal AI Callers ──────────────────────────────────────────────────────
 
 async def _call_gemini_gateway(prompt: str, model: str) -> str:
-    """Call Gemini REST API directly (no SDK dependency on server)."""
+    """Call Gemini using the official google-genai SDK provided by Shantanu."""
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not set on the server.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-    body = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "temperature": 0.2,
-            "maxOutputTokens": 8192,
-        },
-    }
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(url, json=body)
+    try:
+        # Client automatically environment variable se GEMINI_API_KEY utha lega
+        client = genai.Client()
+        
+        # Humara strict JSON wala system prompt aur tumhara prompt ek sath jod rahe hain
+        full_prompt = f"{SYSTEM_PROMPT}\n\nUser Request:\n{prompt}"
+        
+        # Tumhara laya hua latest generation code (asyncio thread mein run kar rahe hain taaki server hang na ho)
+        def sync_gemini_call():
+            return client.models.generate_content(
+                model="gemini-3-flash-preview", # Tumhara latest model!
+                contents=full_prompt
+            )
+            
+        response = await asyncio.to_thread(sync_gemini_call)
+        return response.text
 
-    if resp.status_code == 429:
-        raise HTTPException(status_code=429, detail="Gemini rate limit exceeded. Please wait and retry.")
-    if resp.status_code == 401 or resp.status_code == 403:
-        raise HTTPException(status_code=502, detail="Gemini API key is invalid or unauthorised.")
-    if not resp.is_success:
-        detail = resp.json().get("error", {}).get("message", resp.text)
-        raise HTTPException(status_code=502, detail=f"Gemini error: {detail}")
-
-    data = resp.json()
-    return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+    except Exception as e:
+        log.error(f"Gemini SDK Error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Gemini SDK error: {str(e)}")
 
 
 async def _call_groq_gateway(prompt: str, model: str) -> str:
