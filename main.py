@@ -861,38 +861,49 @@ class AIGatewayResponse(BaseModel):
 # ── Naya Gemini SDK Import ──
 log = logging.getLogger("ethrix-forge")
 
-async def _call_gemini_gateway(prompt: str, model: str) -> str:
-    """Bulletproof Gemini Call for Shantanu's Ethrix-Forge"""
+# 🚀 Shantanu's Master Fallback List (Top Free-Tier Models)
+FALLBACK_MODELS = [
+    "gemini-1.5-flash",       # Sabse fast aur stable (Top Priority)
+    "gemini-1.5-pro",         # Heavy coding ke liye best
+    "gemini-1.5-flash-8b",    # Naya aur super lightweight model
+    "gemini-2.0-flash-lite-preview-02-05", # 2.0 ka lite version
+    "gemini-1.0-pro"          # Sabse purana aur reliable backup
+]
+
+async def _call_gemini_gateway(prompt: str, requested_model: str) -> str:
+    """Bulletproof Gemini Call with Shantanu's Fallback Engine"""
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY is missing!")
 
-    try:
-        # 1. Api Key explicitly pass kar rahe hain taaki Docker mein error na aaye
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        
-        full_prompt = f"{SYSTEM_PROMPT}\n\nUser Request:\n{prompt}"
-        
-        # 2. Tumhara function
-        def sync_gemini_call():
-            return client.models.generate_content(
-                # Darling, agar 'gemini-3-flash-preview' fail ho raha ho, toh isko 
-                # 'gemini-2.0-flash' kar dena, API keys par naye model block ho sakte hain!
-                model="gemini-2.0-flash", 
-                contents=full_prompt
-            )
-            
-        # 3. Thread mein run kiya
-        response = await asyncio.to_thread(sync_gemini_call)
-        
-        # 4. Hugging Face Logs mein print karega taaki hum result dekh sakein!
-        log.info(f"Gemini Success! Raw Response: {response.text[:100]}...") 
-        
-        return response.text
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser Request:\n{prompt}"
+    last_error = ""
 
-    except Exception as e:
-        # Asli error ab Hugging Face ke Logs mein print hoga!
-        log.error(f"GEMINI CRASHED: {str(e)}")
-        raise HTTPException(status_code=502, detail=f"Gemini API Error: {str(e)}")
+    # Ek-ek karke saare models try karenge jab tak success na mile!
+    for current_model in FALLBACK_MODELS:
+        log.info(f"🔄 Trying Gemini model: {current_model}...")
+        try:
+            def sync_gemini_call(m):
+                return client.models.generate_content(
+                    model=m, 
+                    contents=full_prompt
+                )
+                
+            response = await asyncio.to_thread(sync_gemini_call, current_model)
+            
+            log.info(f"✅ Gemini Success with {current_model}! Raw Response: {response.text[:100]}...") 
+            return response.text
+
+        except Exception as e:
+            # Agar fail hua, toh error log karke agla model try karega
+            error_msg = str(e)
+            log.warning(f"⚠️ Model {current_model} failed: {error_msg}")
+            last_error = error_msg
+            continue # Agle model par jao
+
+    # Agar saare 5 models fail ho gaye (jo ki almost impossible hai)
+    log.error(f"❌ ALL GEMINI MODELS FAILED. Last error: {last_error}")
+    raise HTTPException(status_code=502, detail=f"All Gemini models exhausted. Last Error: {last_error}")
 
 
 async def _call_groq_gateway(prompt: str, model: str) -> str:
