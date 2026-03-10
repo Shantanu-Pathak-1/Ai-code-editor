@@ -866,7 +866,7 @@ GEMINI_MODELS = [
     "gemini-2.5-flash",                    # 🔥 Sabse fast aur powerful! (Top Priority)
     "gemini-2.0-flash", 
     "gemini-2.0-flash-lite-preview-02-05", 
-    "gemini-1.5-flash
+    "gemini-1.5-flash"
 ]
 OPENROUTER_MODELS = [
     "qwen/qwen-2.5-coder-32b-instruct:free", # Free aur best coding
