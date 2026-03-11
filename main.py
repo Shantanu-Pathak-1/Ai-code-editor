@@ -323,14 +323,16 @@ STRICT RULES
 
 # ── Gemini key discovery ──────────────────────────────────────────────────────
 
-def _get_gemini_keys() -> list[str]:
-    """Collect GEMINI_API_KEY, GEMINI_API_KEY_2 … GEMINI_API_KEY_10 in order."""
+# ── Multi-Provider Key Discovery (Round-Robin / Fallback) ─────────────
+
+def _get_provider_keys(prefix: str) -> list[str]:
+    """Collect API keys like GROQ_API_KEY, GROQ_API_KEY_2 ... up to 10."""
     keys: list[str] = []
-    primary = os.getenv("GEMINI_API_KEY", "")
+    primary = os.getenv(f"{prefix}_API_KEY", "")
     if primary:
         keys.append(primary)
     for i in range(2, 11):
-        k = os.getenv(f"GEMINI_API_KEY_{i}", "")
+        k = os.getenv(f"{prefix}_API_KEY_{i}", "")
         if k:
             keys.append(k)
     return keys
@@ -425,14 +427,12 @@ def _sync_call_gemini(api_key: str, user_message: str) -> str:
 
 
 async def _call_gemini_with_fallback(user_message: str) -> tuple[str, str]:
-    """
-    Tries every available Gemini API key in sequence.
-    Switches keys on 429 / RESOURCE_EXHAUSTED; raises on hard failures.
-    Returns (raw_text, key_label).
-    """
-    keys = _get_gemini_keys()
+    # Bas is line ko change karna hai:
+    keys = _get_provider_keys("GEMINI")  
+    
     if not keys:
         raise RuntimeError("No GEMINI_API_KEY found in environment.")
+    # ... baki ka function same rahega
 
     last_exc: Exception | None = None
     for idx, key in enumerate(keys):
@@ -459,11 +459,8 @@ async def _call_gemini_with_fallback(user_message: str) -> tuple[str, str]:
 
 # ── OpenRouter provider ───────────────────────────────────────────────────────
 
-async def _call_openrouter(user_message: str) -> str:
-    """Async OpenRouter call via httpx."""
-    if not OPENROUTER_API_KEY:
-        raise RuntimeError("OPENROUTER_API_KEY not configured.")
-
+async def _call_openrouter(api_key: str, user_message: str) -> str:
+    """Async OpenRouter call via httpx (Uses specific API key)."""
     payload = {
         "model": OPENROUTER_MODEL,
         "messages": [
@@ -474,7 +471,7 @@ async def _call_openrouter(user_message: str) -> str:
         "max_tokens":  8192,
     }
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type":  "application/json",
         "HTTP-Referer":  "https://ethrix-forge.app",
         "X-Title":       "Ethrix-Forge",
@@ -491,19 +488,34 @@ async def _call_openrouter(user_message: str) -> str:
 
 
 async def _call_openrouter_safe(user_message: str) -> tuple[str, str]:
-    logger.info("Trying OpenRouter (%s) …", OPENROUTER_MODEL)
-    text = await _call_openrouter(user_message)
-    logger.info("OpenRouter succeeded.")
-    return text, f"openrouter/{OPENROUTER_MODEL}"
+    keys = _get_provider_keys("OPENROUTER")
+    if not keys:
+        raise RuntimeError("OPENROUTER_API_KEY not configured.")
+
+    last_exc: Exception | None = None
+    for idx, key in enumerate(keys):
+        label = f"OPENROUTER_KEY_{idx+1}"
+        try:
+            logger.info("Trying OpenRouter with %s …", label)
+            text = await _call_openrouter(key, user_message)
+            logger.info("OpenRouter (%s) succeeded.", label)
+            return text, f"openrouter/{OPENROUTER_MODEL}"
+        except Exception as exc:
+            last_exc = exc
+            if _is_rate_limit_error(exc) or "401" in str(exc) or "403" in str(exc):
+                logger.warning("%s failed (%s). Switching to next key …", label, exc)
+                continue
+            else:
+                logger.error("OpenRouter (%s) non-retryable error: %s", label, exc)
+                raise
+
+    raise RuntimeError(f"All OpenRouter keys exhausted. Last error: {last_exc}")
 
 
 # ── Groq provider ─────────────────────────────────────────────────────────────
 
-async def _call_groq(user_message: str) -> str:
-    """Async Groq call via httpx."""
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY not configured.")
-
+async def _call_groq(api_key: str, user_message: str) -> str:
+    """Async Groq call via httpx (Uses specific API key)."""
     payload = {
         "model": GROQ_MODEL,
         "messages": [
@@ -514,7 +526,7 @@ async def _call_groq(user_message: str) -> str:
         "max_tokens":  8192,
     }
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type":  "application/json",
     }
 
@@ -529,11 +541,28 @@ async def _call_groq(user_message: str) -> str:
 
 
 async def _call_groq_safe(user_message: str) -> tuple[str, str]:
-    logger.info("Trying Groq (%s) …", GROQ_MODEL)
-    text = await _call_groq(user_message)
-    logger.info("Groq succeeded.")
-    return text, f"groq/{GROQ_MODEL}"
+    keys = _get_provider_keys("GROQ")
+    if not keys:
+        raise RuntimeError("GROQ_API_KEY not configured.")
 
+    last_exc: Exception | None = None
+    for idx, key in enumerate(keys):
+        label = f"GROQ_KEY_{idx+1}"
+        try:
+            logger.info("Trying Groq with %s …", label)
+            text = await _call_groq(key, user_message)
+            logger.info("Groq (%s) succeeded.", label)
+            return text, f"groq/{GROQ_MODEL}"
+        except Exception as exc:
+            last_exc = exc
+            if _is_rate_limit_error(exc) or "401" in str(exc) or "403" in str(exc):
+                logger.warning("%s failed (%s). Switching to next key …", label, exc)
+                continue
+            else:
+                logger.error("Groq (%s) non-retryable error: %s", label, exc)
+                raise
+
+    raise RuntimeError(f"All Groq keys exhausted. Last error: {last_exc}")
 
 # ── Master orchestrator ───────────────────────────────────────────────────────
 
